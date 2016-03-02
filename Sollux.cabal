@@ -1,10 +1,11 @@
 name:                Sollux
 version:             0.1.0
 synopsis:            Domain and SSL manager for HMI
-license:             AllRightsReserved
+license:             OtherLicense
+license-file:        LICENSE
 author:              Alessandro Gatti
 maintainer:          zikyky@gmail.com
-copyright:           2016 HMI
+homepage:            https://github.com/Hamcha/Sollux
 category:            System Tools
 build-type:          Simple
 cabal-version:       >=1.10
