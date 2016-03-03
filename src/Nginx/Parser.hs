@@ -28,8 +28,8 @@ instance Show NPPValue where
   show (NPPList x)  = "Multiple "  ++ show x
   show (NPPBlock x) = "Block " ++ show x
 
-parse :: String -> NPPValue
-parse code = NPPBlock $ (parseLines . (map tokenize) . (map trimRight) . (filter nonempty) . lines) code
+parse :: String -> [NPPProperty]
+parse = parseLines . (map tokenize) . (map trimRight) . (filter nonempty) . lines
 
 nonempty :: String -> Bool
 nonempty str = length (dropWhile Char.isSpace str) > 0

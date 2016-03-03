@@ -1,6 +1,7 @@
 module Main where
 
 import qualified Nginx.Parser
+import qualified Nginx.Compiler
 
 example :: String
 example = unlines [
@@ -26,4 +27,4 @@ example = unlines [
 
 main :: IO ()
 main = do
-  print $ Nginx.Parser.parse example
+  (putStrLn . Nginx.Compiler.compile . Nginx.Parser.parse) example
