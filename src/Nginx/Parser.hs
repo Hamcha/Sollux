@@ -10,6 +10,7 @@ module Nginx.Parser
 
 import qualified Data.Char as Char (isSpace)
 
+-- | NPP Property (key/value pair)
 type NPPProperty = (String, NPPValue)
 
 data NPPToken = TString    String
@@ -17,10 +18,11 @@ data NPPToken = TString    String
               | TBlockDecl
               deriving (Eq, Show)
 
-data NPPValue = NPPVoid
-              | NPPVal   String
-              | NPPList  [NPPValue]
-              | NPPBlock [NPPProperty]
+-- | Value of a property
+data NPPValue = NPPVoid                -- ^ No value
+              | NPPVal   String        -- ^ Single string value
+              | NPPList  [NPPValue]    -- ^ Multiple strings value
+              | NPPBlock [NPPProperty] -- ^ Block containing other properties
 
 instance Show NPPValue where
   show (NPPVoid)    = "Void"
@@ -28,6 +30,7 @@ instance Show NPPValue where
   show (NPPList x)  = "Multiple "  ++ show x
   show (NPPBlock x) = "Block " ++ show x
 
+-- | Parses a NPP file and returns its parsed structure
 parse :: String -> [NPPProperty]
 parse = parseLines . (map tokenize) . (map trimRight) . (filter nonempty) . lines
 
