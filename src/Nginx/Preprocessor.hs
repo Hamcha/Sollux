@@ -1,3 +1,5 @@
+{-# LANGUAGE Safe #-}
+
 {-|
 Module      : Nginx.Preprocessor
 Description : Processes .npp structures to fill in macros, functions etc
@@ -6,7 +8,7 @@ module Nginx.Preprocessor
 ( process
 ) where
 
-import Nginx.Parser
+import safe Nginx.Parser
 
 -- | Process an NPP tree
 process :: [NPPProperty] -> [NPPProperty]

@@ -1,3 +1,5 @@
+{-# LANGUAGE Safe #-}
+
 {-|
 Module      : Nginx.Parser
 Description : Parsing structure and functions for .npp (nginx templates) files
@@ -8,7 +10,7 @@ module Nginx.Parser
 , parse
 ) where
 
-import qualified Data.Char as Char (isSpace)
+import safe qualified Data.Char as Char (isSpace)
 
 -- | NPP Property (key/value pair)
 type NPPProperty = (String, NPPValue)

@@ -1,3 +1,5 @@
+{-# LANGUAGE Safe #-}
+
 {-|
 Module      : Nginx.Compiler
 Description : Compiles parsed and processed NPP templates into raw nginx configuration files
@@ -6,8 +8,8 @@ module Nginx.Compiler
 ( compile
 ) where
 
-import qualified Data.List    as List
-import           Nginx.Parser
+import safe qualified Data.List    as List
+import safe           Nginx.Parser
 
 -- | Compiles a NPP structure into an Nginx configuration file
 compile :: [NPPProperty] -> String
