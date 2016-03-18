@@ -1,7 +1,8 @@
 module Main where
 
-import qualified Nginx.Parser
-import qualified Nginx.Compiler
+import qualified CLI                       (unknown, unknownHelp)
+import qualified Nginx                     (execute, help)
+import qualified System.Environment as Env (getArgs, getProgName)
 
 example :: String
 example = unlines [
@@ -25,6 +26,23 @@ example = unlines [
   "",
   "\t@include sites/*"]
 
+usage :: IO ()
+usage = Env.getProgName >>=
+  \appname -> (putStr . unlines) [
+    "Usage: " ++ appname ++ " <command> [<arguments>]"
+  ]
+
+help :: [String] -> IO ()
+help []         = usage
+help ("npp":xs) = Nginx.help xs
+help (x:_)      = CLI.unknownHelp x
+
+parseArgs :: [String] -> IO ()
+parseArgs []          = usage
+parseArgs ("help":xs) = help xs
+parseArgs ("npp" :xs) = Nginx.execute xs
+parseArgs (x     :_ ) = CLI.unknown x
+
 main :: IO ()
-main = do
-  (putStrLn . Nginx.Compiler.compile . Nginx.Parser.parse) example
+main = Env.getArgs >>= parseArgs
+--  (putStrLn . compile . process . parse) example
