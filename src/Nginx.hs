@@ -18,5 +18,6 @@ help (x:_) = CLI.unknownSubHelp ["npp"] x
 
 -- | CLI parsing and execution for NPP
 execute :: [String] -> IO ()
+execute []            = help []
 execute (x:_)         = CLI.unknownSub ["npp"] x
 --  (putStrLn . compile . process . parse) example
