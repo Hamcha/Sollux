@@ -8,16 +8,31 @@ module Nginx.Preprocessor
 ( process
 ) where
 
-import safe Nginx.Parser
+import safe           Nginx.Parser       (NPPProperty, NPPValue(..), parse)
+import safe qualified System.IO    as IO (readFile)
+
+type PPContext  = [PPProperty]
+type PPProperty = (String, String)
 
 -- | Process an NPP tree
-process :: [NPPProperty] -> [NPPProperty]
-process = map processLine
+process :: PPContext -> [NPPProperty] -> IO [NPPProperty]
+process ctx = fmap concat . sequence . map (processLine ctx)
 
-processLine :: NPPProperty -> NPPProperty
-processLine (('@':x), y)    = execute x y               -- Preprocessor instruction, handle it
-processLine (x, NPPBlock y) = (x, NPPBlock $ process y) -- Recurse processing in blocks
-processLine x               = x                         -- Plain property, leave it as it is
+processLine :: PPContext -> NPPProperty -> IO [NPPProperty]
+processLine c (('@':x), y)    = execute c x y -- Preprocessor instruction, handle it
+processLine c (x, NPPBlock y) = do            -- Recurse processing in blocks
+  py <- process c y
+  return [(x, NPPBlock py)]
+processLine _ x               = return [x]    -- Plain property, leave it as it is
 
-execute :: String -> NPPValue -> NPPProperty
-execute x y = error $ "Unknown NPP directive \"" ++ x ++ "\" with params: " ++ (show y)
+execute :: PPContext -> String -> NPPValue -> IO [NPPProperty]
+execute c "include" (NPPVal y) = do
+  file <- IO.readFile y
+  --TODO Get current filename, delta with new filename, add to context and update context
+  let dc = [("filepath", includepathdiff y )]
+  let nc = updateContext c y
+  return $ process nc . parse
+execute _ x         y          = error $ "Unknown NPP directive \"" ++ x ++ "\" with params: " ++ (show y)
+
+updateContext :: PPContext -> PPContext -> PPContext
+updateContext c

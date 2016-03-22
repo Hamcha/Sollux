@@ -53,13 +53,14 @@ tokenize' (x:xs) cw | Char.isSpace x = (tokenize' "" cw) ++ (TSpace x) : tokeniz
                     | otherwise      = tokenize' xs (cw ++ [x])
 
 isIndent :: [NPPToken] -> Bool
+isIndent []           = False
 isIndent (TSpace _:_) = True
-isIndent (x:xs)       = False
+isIndent (_       :_) = False
 
 getIndentation :: [NPPToken] -> [NPPToken]
 getIndentation []            = []
 getIndentation (TSpace x:xs) = TSpace x : getIndentation xs
-getIndentation (_:xs)        = []
+getIndentation (_       :_)  = []
 
 dropIndent :: [NPPToken] -> [NPPToken] -> [NPPToken]
 dropIndent []     y      = y
@@ -75,7 +76,7 @@ trimIndent list = map (dropIndent indent) list
 
 
 parseValue :: NPPToken -> NPPValue
-parseValue (TSpace  x)  = NPPVoid
+parseValue (TSpace  _)  = NPPVoid
 parseValue (TString x)  = NPPVal x
 parseValue x            = error $ "Syntax error!\n\nToken: " ++ show x
 
