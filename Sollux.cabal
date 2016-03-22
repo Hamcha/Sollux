@@ -17,4 +17,4 @@ executable Sollux
   default-extensions:  Safe
   build-depends:       base >= 4.7 && < 5
   ghc-options:         -Wall
-  other-modules:       CLI, Nginx
+  other-modules:       CLI, Config, Nginx
