@@ -8,8 +8,11 @@ module Nginx.Preprocessor
 ( process
 ) where
 
-import safe           Nginx.Parser       (NPPProperty, NPPValue(..), parse)
-import safe qualified System.IO    as IO (readFile)
+import safe           Nginx.Parser                (NPPProperty, NPPValue(..), parse)
+import safe qualified Data.List       as List     (unionBy)
+import safe qualified System.IO       as IO       (readFile)
+import safe qualified System.FilePath as Filepath (combine, dropFileName, hasExtension)
+import safe           Utils                       (must)
 
 type PPContext  = [PPProperty]
 type PPProperty = (String, String)
@@ -27,12 +30,23 @@ processLine _ x               = return [x]    -- Plain property, leave it as it 
 
 execute :: PPContext -> String -> NPPValue -> IO [NPPProperty]
 execute c "include" (NPPVal y) = do
-  file <- IO.readFile y
-  --TODO Get current filename, delta with new filename, add to context and update context
-  let dc = [("filepath", includepathdiff y )]
-  let nc = updateContext c y
-  return $ process nc . parse
+  let fname = includepathdiff c y
+  file <- IO.readFile fname
+  let nc = updateContext c [("filepath", fname)]
+  process nc $ parse file
 execute _ x         y          = error $ "Unknown NPP directive \"" ++ x ++ "\" with params: " ++ (show y)
 
 updateContext :: PPContext -> PPContext -> PPContext
-updateContext c
+updateContext a b = List.unionBy eq b a
+  where
+    eq (x, _) (y, _) = x == y
+
+includepathdiff :: PPContext -> String -> String
+includepathdiff c = Filepath.combine cwd . fixExtension
+  where
+    cwd  = Filepath.dropFileName base
+    base = must $ lookup "filepath" c
+
+fixExtension :: String -> String
+fixExtension fname | not $ Filepath.hasExtension fname = fname ++ ".npp"
+                   | otherwise                         = fname

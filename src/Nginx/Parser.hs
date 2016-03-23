@@ -21,10 +21,10 @@ data NPPToken = TString    String
               deriving (Eq, Show)
 
 -- | Value of a property
-data NPPValue = NPPVoid                -- ^ No value
-              | NPPVal   String        -- ^ Single string value
-              | NPPList  [NPPValue]    -- ^ Multiple strings value
-              | NPPBlock [NPPProperty] -- ^ Block containing other properties
+data NPPValue = NPPVoid                            -- ^ No value
+              | NPPVal   String                    -- ^ Single string value
+              | NPPList  [NPPValue]                -- ^ Multiple strings value
+              | NPPBlock (NPPValue, [NPPProperty]) -- ^ Block containing other properties
 
 instance Show NPPValue where
   show (NPPVoid)    = "Void"
@@ -90,6 +90,7 @@ wrapValue []     = NPPVoid
 wrapValue (x:[]) = x
 wrapValue xs     = NPPList xs
 
+-- TODO REWRITE
 parseLines :: [[NPPToken]] -> [NPPProperty]
 parseLines [] = []
 parseLines ((TString str:TBlockDecl:_):xs) =

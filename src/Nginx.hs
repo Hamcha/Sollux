@@ -15,6 +15,7 @@ import safe           Nginx.Parser       (parse)
 import safe           Nginx.Preprocessor (process)
 import safe           Nginx.Compiler     (compile)
 import safe qualified System.IO as IO    (readFile)
+import safe           Utils              (must)
 
 -- | Help topics for NPP
 help :: [String] -> IO ()
@@ -25,10 +26,6 @@ help (x:_) = CLI.unknownSubHelp ["npp"] x
 execute :: Config.Cfg -> [String] -> IO ()
 execute c []    = regen c
 execute _ (x:_) = CLI.unknownSub ["npp"] x
-
-must :: Maybe String -> String
-must (Just c) = c
-must _        = error "Could not find required value!"
 
 regen :: Config.Cfg -> IO ()
 regen c = do
