@@ -16,10 +16,12 @@ compile :: [NPPProperty] -> String
 compile = (List.intercalate "\n") . compileProps
 
 flatten :: [NPPValue] -> String
-flatten []            = ""
-flatten (NPPVal x:[]) = x
-flatten (NPPVal x:xs) = x ++ flatten xs
-flatten (x:xs)        = error "Parsing error! Non NPPVal in NPPList: " ++ (show x)
+flatten []             = ""
+flatten (NPPVoid  :xs) = flatten xs
+flatten (NPPList x:xs) = flatten x ++ " " ++ flatten xs
+flatten (NPPVal  x:[]) = x
+flatten (NPPVal  x:xs) = x ++ " " ++ flatten xs
+flatten (        x:_ ) = error $ "Parsing error! Non NPPVal in NPPList: " ++ (show x)
 
 indent :: String -> String
 indent str = '\t' : str
@@ -29,5 +31,5 @@ compileProps [] = []
 compileProps ((key, NPPVoid     ):xs) = (key                         ++ ";") : compileProps xs
 compileProps ((key, NPPVal   val):xs) = ((key ++ " " ++ val)         ++ ";") : compileProps xs
 compileProps ((key, NPPList  lst):xs) = ((key ++ " " ++ flatten lst) ++ ";") : compileProps xs
-compileProps ((key, NPPBlock blk):xs) =
-  (key ++ " {") : (map indent $ compileProps blk) ++ "}" : compileProps xs
+compileProps ((key, NPPBlock (str,blk)):xs) =
+  (((flatten . stripVoid) [NPPVal key, str]) ++ " {") : (map indent $ compileProps blk) ++ "}" : compileProps xs

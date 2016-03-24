@@ -8,6 +8,7 @@ module Nginx.Parser
 ( NPPProperty
 , NPPValue(..)
 , parse
+, stripVoid
 ) where
 
 import safe qualified Data.Char as Char (isSpace)
@@ -27,10 +28,10 @@ data NPPValue = NPPVoid                            -- ^ No value
               | NPPBlock (NPPValue, [NPPProperty]) -- ^ Block containing other properties
 
 instance Show NPPValue where
-  show (NPPVoid)    = "Void"
-  show (NPPVal x)   = "Value "  ++ show x
-  show (NPPList x)  = "Multiple "  ++ show x
-  show (NPPBlock x) = "Block " ++ show x
+  show (NPPVoid)         = "Void"
+  show (NPPVal x)        = "Value " ++ show x
+  show (NPPList x)       = "Multiple " ++ show x
+  show (NPPBlock (x, y)) = "Block " ++ show x ++ ": " ++ show y
 
 -- | Parses a NPP file and returns its parsed structure
 parse :: String -> [NPPProperty]
@@ -71,8 +72,8 @@ trimIndent :: [[NPPToken]] -> [[NPPToken]]
 trimIndent []   = []
 trimIndent list = map (dropIndent indent) list
   where
-  indent = getIndentation first
-  first = head list
+    indent = getIndentation first
+    first = head list
 
 
 parseValue :: NPPToken -> NPPValue
@@ -80,6 +81,7 @@ parseValue (TSpace  _)  = NPPVoid
 parseValue (TString x)  = NPPVal x
 parseValue x            = error $ "Syntax error!\n\nToken: " ++ show x
 
+-- | Strip NPPVoid values from NPPValue list
 stripVoid :: [NPPValue] -> [NPPValue]
 stripVoid []           = []
 stripVoid (NPPVoid:xs) = stripVoid xs
@@ -90,7 +92,7 @@ wrapValue []     = NPPVoid
 wrapValue (x:[]) = x
 wrapValue xs     = NPPList xs
 
--- TODO REWRITE
+{-
 parseLines :: [[NPPToken]] -> [NPPProperty]
 parseLines [] = []
 parseLines ((TString str:TBlockDecl:_):xs) =
@@ -101,3 +103,24 @@ parseLines ((TString str:TBlockDecl:_):xs) =
 parseLines ((TString str:rest):xs) =
   (str, (wrapValue . stripVoid . map parseValue) rest) : parseLines xs
 parseLines x = error $ "Syntax error!\n\nAST: " ++ (show x)
+-}
+
+parseLines :: [[NPPToken]] -> [NPPProperty]
+parseLines []     = []
+parseLines (x:xs) | isBlockDecl x = parseBlockExpr x block : parseLines rest
+                  | otherwise     = parseProperty  x       : parseLines xs
+                  where
+                    block = trimIndent indented
+                    (indented, rest) = span isIndent xs
+
+isBlockDecl :: [NPPToken] -> Bool
+isBlockDecl = elem TBlockDecl
+
+parseProperty :: [NPPToken] -> NPPProperty
+parseProperty (TString str : rest) = (str, (wrapValue . stripVoid . map parseValue) rest)
+parseProperty x                    = error $ "Syntax error!\n\nExpr: " ++ (show x)
+
+parseBlockExpr :: [NPPToken] -> [[NPPToken]] -> NPPProperty
+parseBlockExpr x block = (fst prop, NPPBlock (snd prop, parseLines block))
+  where
+    prop = parseProperty $ takeWhile (/= TBlockDecl) x

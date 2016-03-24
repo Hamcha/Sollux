@@ -23,9 +23,9 @@ process ctx = fmap concat . sequence . map (processLine ctx)
 
 processLine :: PPContext -> NPPProperty -> IO [NPPProperty]
 processLine c (('@':x), y)    = execute c x y -- Preprocessor instruction, handle it
-processLine c (x, NPPBlock y) = do            -- Recurse processing in blocks
+processLine c (x, NPPBlock (val,y)) = do      -- Recurse processing in blocks
   py <- process c y
-  return [(x, NPPBlock py)]
+  return [(x, NPPBlock (val,py))]
 processLine _ x               = return [x]    -- Plain property, leave it as it is
 
 execute :: PPContext -> String -> NPPValue -> IO [NPPProperty]
