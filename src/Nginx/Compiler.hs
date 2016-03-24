@@ -13,7 +13,7 @@ import safe           Nginx.Parser
 
 -- | Compiles a NPP structure into an Nginx configuration file
 compile :: [NPPProperty] -> String
-compile = (List.intercalate "\n") . compileProps
+compile = List.intercalate "\n" . compileProps
 
 flatten :: [NPPValue] -> String
 flatten []             = ""
@@ -32,4 +32,7 @@ compileProps ((key, NPPVoid     ):xs) = (key                         ++ ";") : c
 compileProps ((key, NPPVal   val):xs) = ((key ++ " " ++ val)         ++ ";") : compileProps xs
 compileProps ((key, NPPList  lst):xs) = ((key ++ " " ++ flatten lst) ++ ";") : compileProps xs
 compileProps ((key, NPPBlock (str,blk)):xs) =
-  (((flatten . stripVoid) [NPPVal key, str]) ++ " {") : (map indent $ compileProps blk) ++ "}" : compileProps xs
+  (header ++ " {") : contents ++ "}" : compileProps xs
+  where
+    contents = map indent $ compileProps blk
+    header   = flatten $ stripVoid [NPPVal key, str]

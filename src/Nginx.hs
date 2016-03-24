@@ -10,11 +10,11 @@ module Nginx
 ) where
 
 import safe qualified CLI                (unknownSub, unknownSubHelp)
-import safe qualified Config             (Cfg, readCfg)
+import safe qualified Config             (Cfg, loadCfg)
 import safe           Nginx.Parser       (parse)
 import safe           Nginx.Preprocessor (process)
 import safe           Nginx.Compiler     (compile)
-import safe qualified System.IO as IO    (readFile)
+import safe qualified System.IO as IO    (readFile, writeFile)
 import safe           Utils              (must)
 
 -- | Help topics for NPP
@@ -24,17 +24,19 @@ help (x:_) = CLI.unknownSubHelp ["npp"] x
 
 -- | CLI parsing and execution for NPP
 execute :: Config.Cfg -> [String] -> IO ()
-execute c []    = regen c
+execute c []    = Config.loadCfg "/npp.conf" c >>= regen
 execute _ (x:_) = CLI.unknownSub ["npp"] x
 
 regen :: Config.Cfg -> IO ()
-regen c = do
-  let cfgpath = must $ lookup "confdir" c
-  ngcfg <- Config.readCfg (cfgpath ++ "/npp.conf")
-  let main = must $ lookup "main" ngcfg
-  --putStrLn . compile <$> process . parse <$> IO.readFile (cfgpath ++ main)
-  let path = cfgpath ++ "/" ++ main
-  file <- IO.readFile path
-  let ctx = [("filepath", path)]
-  out <- (process ctx . parse) file
-  putStrLn $ compile out
+regen cfg =
+  IO.readFile path
+  >>= (process ctx . parse)
+  >>= IO.writeFile outpath . compile
+  where
+    ctx     = [("filepath", path)]
+    outpath = cfgpath ++ "/" ++ outrel
+    path    = cfgpath ++ "/" ++ main
+    outrel  = get "out"
+    cfgpath = get "confdir"
+    main    = get "main"
+    get str = must $ lookup str cfg

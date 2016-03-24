@@ -61,7 +61,7 @@ isIndent (_       :_) = False
 getIndentation :: [NPPToken] -> [NPPToken]
 getIndentation []            = []
 getIndentation (TSpace x:xs) = TSpace x : getIndentation xs
-getIndentation (_       :_)  = []
+getIndentation (_       :_ ) = []
 
 dropIndent :: [NPPToken] -> [NPPToken] -> [NPPToken]
 dropIndent []     y      = y
@@ -73,8 +73,7 @@ trimIndent []   = []
 trimIndent list = map (dropIndent indent) list
   where
     indent = getIndentation first
-    first = head list
-
+    first  = head list
 
 parseValue :: NPPToken -> NPPValue
 parseValue (TSpace  _)  = NPPVoid
@@ -92,19 +91,6 @@ wrapValue []     = NPPVoid
 wrapValue (x:[]) = x
 wrapValue xs     = NPPList xs
 
-{-
-parseLines :: [[NPPToken]] -> [NPPProperty]
-parseLines [] = []
-parseLines ((TString str:TBlockDecl:_):xs) =
-  (str, NPPBlock $ parseLines block) : parseLines rest
-  where
-  block = trimIndent indented
-  (indented, rest) = span isIndent xs
-parseLines ((TString str:rest):xs) =
-  (str, (wrapValue . stripVoid . map parseValue) rest) : parseLines xs
-parseLines x = error $ "Syntax error!\n\nAST: " ++ (show x)
--}
-
 parseLines :: [[NPPToken]] -> [NPPProperty]
 parseLines []     = []
 parseLines (x:xs) | isBlockDecl x = parseBlockExpr x block : parseLines rest
@@ -121,6 +107,7 @@ parseProperty (TString str : rest) = (str, (wrapValue . stripVoid . map parseVal
 parseProperty x                    = error $ "Syntax error!\n\nExpr: " ++ (show x)
 
 parseBlockExpr :: [NPPToken] -> [[NPPToken]] -> NPPProperty
-parseBlockExpr x block = (fst prop, NPPBlock (snd prop, parseLines block))
+parseBlockExpr x block =
+  (fst prop, NPPBlock (snd prop, parseLines block))
   where
     prop = parseProperty $ takeWhile (/= TBlockDecl) x

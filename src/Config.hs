@@ -8,6 +8,7 @@ module Config
 ( Cfg
 , ConfigProperty
 , readCfg
+, loadCfg
 , add
 , merge
 ) where
@@ -15,6 +16,7 @@ module Config
 import safe qualified System.IO as IO   (readFile)
 import safe qualified Data.Char as Char (isSpace)
 import safe qualified Data.List as List (elemIndex)
+import safe           Utils             (must)
 
 -- | Config properties/values
 type Cfg = [ConfigProperty]
@@ -34,6 +36,10 @@ merge = concat
 readCfg :: String -> IO Cfg
 readCfg = (map parseCfgLine . lines <$>) . IO.readFile
 
+-- | Read a config file into an existing Cfg struct
+loadCfg :: String -> Cfg -> IO Cfg
+loadCfg str cur = (readCfg . mkCfgFilename cur) str >>= \cfg -> return $ merge [cur, cfg]
+
 parseCfgLine :: String -> ConfigProperty
 parseCfgLine str =
     (trim key, trim val)
@@ -47,3 +53,6 @@ parseCfgLine str =
     getIdx :: Maybe Int -> Int
     getIdx (Just c) = c
     getIdx _        = error $ "Invalid config line: " ++ str
+
+mkCfgFilename :: Cfg -> String -> String
+mkCfgFilename cfg fname = (must $ lookup "confdir" cfg) ++ "/" ++ fname

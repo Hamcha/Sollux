@@ -22,11 +22,10 @@ process :: PPContext -> [NPPProperty] -> IO [NPPProperty]
 process ctx = fmap concat . sequence . map (processLine ctx)
 
 processLine :: PPContext -> NPPProperty -> IO [NPPProperty]
-processLine c (('@':x), y)    = execute c x y -- Preprocessor instruction, handle it
-processLine c (x, NPPBlock (val,y)) = do      -- Recurse processing in blocks
-  py <- process c y
-  return [(x, NPPBlock (val,py))]
-processLine _ x               = return [x]    -- Plain property, leave it as it is
+processLine c (('@':x), y)          = execute c x y -- Preprocessor instruction, handle it
+processLine c (x, NPPBlock (val,y)) =               -- Recurse processing in blocks
+  process c y >>= \py -> return [(x, NPPBlock (val, py))]
+processLine _ x                     = return [x]    -- Plain property, leave it as it is
 
 execute :: PPContext -> String -> NPPValue -> IO [NPPProperty]
 execute c "include" (NPPVal y) = do
@@ -37,12 +36,14 @@ execute c "include" (NPPVal y) = do
 execute _ x         y          = error $ "Unknown NPP directive \"" ++ x ++ "\" with params: " ++ (show y)
 
 updateContext :: PPContext -> PPContext -> PPContext
-updateContext a b = List.unionBy eq b a
+updateContext a b =
+  List.unionBy eq b a
   where
     eq (x, _) (y, _) = x == y
 
 includepathdiff :: PPContext -> String -> String
-includepathdiff c = Filepath.combine cwd . fixExtension
+includepathdiff c =
+  Filepath.combine cwd . fixExtension
   where
     cwd  = Filepath.dropFileName base
     base = must $ lookup "filepath" c
