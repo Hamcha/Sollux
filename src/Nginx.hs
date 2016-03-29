@@ -30,8 +30,8 @@ execute _ (x:_) = CLI.unknownSub ["npp"] x
 regen :: Config.Cfg -> IO ()
 regen cfg =
   IO.readFile path
-  >>= process ctx . parse
-  >>= IO.writeFile outpath . compile
+    >>= process ctx . parse
+    >>= IO.writeFile outpath . compile
   where
     ctx     = [("filepath", path)]
     outpath = cfgpath ++ "/" ++ outrel

@@ -28,12 +28,14 @@ processLine c (x, NPPBlock (val,y)) =               -- Recurse processing in blo
 processLine _ x                     = return [x]    -- Plain property, leave it as it is
 
 execute :: PPContext -> String -> NPPValue -> IO [NPPProperty]
-execute c "include" (NPPVal y) = do
-  let fname = includepathdiff c y
-  file <- IO.readFile fname
-  let nc = updateContext c [("filepath", fname)]
-  process nc $ parse file
-execute _ x         y          = error $ "Unknown NPP directive \"" ++ x ++ "\" with params: " ++ (show y)
+execute ctx "include" (NPPVal y) =
+  IO.readFile filename
+    >>= process newctx . parse
+  where
+    newctx   = updateContext ctx [("filepath", filename)]
+    filename = includepathdiff ctx y
+execute _ x y =
+  error $ "Unknown NPP directive \"" ++ x ++ "\" with params: " ++ (show y)
 
 updateContext :: PPContext -> PPContext -> PPContext
 updateContext a b =
