@@ -12,7 +12,7 @@ module Nginx
 import safe qualified CLI                (unknownSub, unknownSubHelp)
 import safe qualified Config             (Cfg, loadCfg)
 import safe           Nginx.Parser       (parse)
-import safe           Nginx.Preprocessor (process)
+import safe           Nginx.Preprocessor (PPValue(..), process)
 import safe           Nginx.Compiler     (compile)
 import safe qualified System.IO as IO    (readFile, writeFile)
 import safe           Utils              (must)
@@ -33,7 +33,7 @@ regen cfg =
     >>= process ctx . parse
     >>= IO.writeFile outpath . compile
   where
-    ctx     = [("filepath", path)]
+    ctx     = [("filepath", PPVal path)]
     outpath = cfgpath ++ "/" ++ outrel
     path    = cfgpath ++ "/" ++ main
     outrel  = get "out"
