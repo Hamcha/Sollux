@@ -33,7 +33,7 @@ regen cfg =
     >>= process ctx . parse
     >>= IO.writeFile outpath . compile
   where
-    ctx     = [("filepath", PPVal path)]
+    ctx     = [("filepath", PPVar path)]
     outpath = cfgpath ++ "/" ++ outrel
     path    = cfgpath ++ "/" ++ main
     outrel  = get "out"
