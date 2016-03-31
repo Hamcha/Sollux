@@ -13,9 +13,9 @@ module Nginx.Preprocessor
 import safe           Nginx.Parser                 (NPPProperty, NPPValue(..), parse)
 import safe qualified Data.List        as List     (intercalate, unionBy, isPrefixOf, isSuffixOf)
 import safe qualified System.Directory as Dir      (listDirectory)
-import safe qualified System.FilePath  as Filepath (combine, dropFileName, splitFileName, hasExtension)
+import safe qualified System.FilePath  as Filepath (dropFileName, splitFileName, hasExtension)
 import safe qualified System.IO        as IO       (readFile)
-import safe           Utils                        (must)
+import safe           Utils                        (abspath, must)
 
 type PPContext  = [PPProperty]
 
@@ -184,7 +184,7 @@ updateContext a b =
 
 includepathdiff :: PPContext -> String -> FilePath -> FilePath
 includepathdiff c ext =
-  Filepath.combine cwd . fixExtension ext
+  fixExtension ext . abspath cwd
   where
     cwd  = Filepath.dropFileName base
     base = show . must $ lookup "filepath" c

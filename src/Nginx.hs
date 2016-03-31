@@ -15,7 +15,7 @@ import safe           Nginx.Parser       (parse)
 import safe           Nginx.Preprocessor (PPValue(..), process)
 import safe           Nginx.Compiler     (compile)
 import safe qualified System.IO as IO    (readFile, writeFile)
-import safe           Utils              (must)
+import safe           Utils              (abspath, must)
 
 -- | Help topics for NPP
 help :: [String] -> IO ()
@@ -34,8 +34,8 @@ regen cfg =
     >>= IO.writeFile outpath . compile
   where
     ctx     = [("filepath", PPVar path)]
-    outpath = cfgpath ++ "/" ++ outrel
-    path    = cfgpath ++ "/" ++ main
+    outpath = abspath cfgpath outrel
+    path    = abspath cfgpath main
     outrel  = get "out"
     cfgpath = get "confdir"
     main    = get "main"
