@@ -35,10 +35,13 @@ instance Show NPPValue where
 
 -- | Parses a NPP file and returns its parsed structure
 parse :: String -> [NPPProperty]
-parse = parseLines . (map tokenize) . (map trimRight) . (filter nonempty) . lines
+parse = parseLines . map tokenize . map trimRight . filter nocomments . filter nonempty . lines
 
 nonempty :: String -> Bool
 nonempty str = length (dropWhile Char.isSpace str) > 0
+
+nocomments :: String -> Bool
+nocomments = (/= '#') . head . dropWhile Char.isSpace
 
 trimRight :: String -> String
 trimRight = reverse . (dropWhile Char.isSpace) . reverse
