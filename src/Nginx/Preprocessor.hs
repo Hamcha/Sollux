@@ -40,6 +40,8 @@ instance Eq PPValue where
 process :: PPContext -> [NPPProperty] -> IO [NPPProperty]
 process _ []                         = -- No instructions left
   return []
+process c (('\\':'@':x, val):xs)     = -- Escaped @, unescape and process
+  (++) [('@':x, processPlain c val)] <$> process c xs
 process c (('@':x, y):xs)            = -- Preprocessor instruction, handle it
   execute c x y
     >>= \(ctx, prop) -> (++) prop <$> process ctx xs
@@ -162,11 +164,12 @@ processPlain _ x           = error $ "Unknown type of NPPValue passed to process
 
 processValue :: PPContext -> String -> String
 processValue _ []       = []
-processValue c ('@':xs) = value ++ processValue c rest
-                          where
-                            value       = show . must $ lookup var c
-                            (var, rest) = extractVariableName xs
-processValue c (x  :xs) = x : processValue c xs
+processValue c ('\\':'@':xs) = '@' : processValue c xs
+processValue c (     '@':xs) = value ++ processValue c rest
+                              where
+                                value       = show . must $ lookup var c
+                                (var, rest) = extractVariableName xs
+processValue c (       x:xs) = x : processValue c xs
 
 extractVariableName :: String -> (String, String)
 extractVariableName []       = ([], [])
