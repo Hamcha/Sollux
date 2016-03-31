@@ -44,7 +44,7 @@ nocomments :: String -> Bool
 nocomments = (/= '#') . head . dropWhile Char.isSpace
 
 trimRight :: String -> String
-trimRight = reverse . (dropWhile Char.isSpace) . reverse
+trimRight = reverse . (dropWhile (\x -> Char.isSpace x || (x == ';'))) . reverse
 
 tokenize :: String -> [NPPToken]
 tokenize str = tokenize' str ""
