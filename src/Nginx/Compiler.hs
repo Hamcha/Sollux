@@ -13,7 +13,7 @@ import safe           Nginx.Parser
 
 -- | Compiles a NPP structure into an Nginx configuration file
 compile :: [NPPProperty] -> String
-compile = List.intercalate "\n" . compileProps
+compile = appendNL . List.intercalate "\n" . compileProps
 
 flatten :: [NPPValue] -> String
 flatten []             = ""
@@ -22,6 +22,9 @@ flatten (NPPList x:xs) = flatten x ++ " " ++ flatten xs
 flatten (NPPVal  x:[]) = x
 flatten (NPPVal  x:xs) = x ++ " " ++ flatten xs
 flatten (        x:_ ) = error $ "Parsing error! Non NPPVal in NPPList: " ++ (show x)
+
+appendNL :: String -> String
+appendNL txt = txt ++ "\n"
 
 indent :: String -> String
 indent str = '\t' : str
