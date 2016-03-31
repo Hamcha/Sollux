@@ -50,11 +50,11 @@ tokenize :: String -> [NPPToken]
 tokenize str = tokenize' str ""
 
 tokenize' :: String -> String -> [NPPToken]
-tokenize' ""     ""                  = []
-tokenize' ""     cw                  = [TString cw]
-tokenize' (x:xs) cw | Char.isSpace x = (tokenize' "" cw) ++ (TSpace x) : tokenize' xs ""
-                    | x == ':'       = (tokenize' "" cw) ++ TBlockDecl : tokenize' xs ""
-                    | otherwise      = tokenize' xs (cw ++ [x])
+tokenize' ""       ""                  = []
+tokenize' ""       cw                  = [TString cw]
+tokenize' (':':[]) cw                  = (tokenize' "" cw) ++ [TBlockDecl]
+tokenize' (x  :xs) cw | Char.isSpace x = (tokenize' "" cw) ++ (TSpace x) : tokenize' xs ""
+                      | otherwise      = tokenize' xs (cw ++ [x])
 
 isIndent :: [NPPToken] -> Bool
 isIndent []           = False
