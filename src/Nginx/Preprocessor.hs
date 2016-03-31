@@ -75,6 +75,8 @@ execute ctx "set" (NPPList ((NPPVal key):(NPPVal val):_)) =
     newctx = updateContext ctx [(key, PPVar val)]
 -- "func NAME [ARGS]: CONTENT"
 --  Declare a function called NAME and with arguments [ARGS] (separated by space)
+execute ctx "func" (NPPBlock ((NPPVal name), content)) =
+  execute ctx "func" (NPPBlock (NPPList [NPPVal name], content))
 execute ctx "func" (NPPBlock (NPPList (NPPVal name:nargs), content)) =
   return (newctx, [])
   where
