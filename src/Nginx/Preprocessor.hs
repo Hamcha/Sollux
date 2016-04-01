@@ -10,7 +10,7 @@ module Nginx.Preprocessor
 , process
 ) where
 
-import safe           Nginx.Parser                 (NPPProperty, NPPValue(..), parse)
+import safe           Nginx.Parser                 (NPPProperty, NPPValue(..), mustParse)
 import safe qualified Data.List        as List     (intercalate, unionBy, isPrefixOf, isSuffixOf)
 import safe qualified System.Directory as Dir      (listDirectory)
 import safe qualified System.FilePath  as Filepath (dropFileName, splitFileName, hasExtension)
@@ -147,14 +147,14 @@ lsMatch base left right =
 includeFile :: PPContext -> FilePath -> IO [NPPProperty]
 includeFile ctx filename =
   IO.readFile filename
-    >>= process newctx . parse
+    >>= process newctx . mustParse
   where
     newctx = updateContext ctx [("filepath", PPVar filename)]
 
 includeLib :: PPContext -> FilePath -> IO PPContext
 includeLib ctx filename =
   IO.readFile filename
-    >>= processLib newctx . parse
+    >>= processLib newctx . mustParse
   where
     newctx = updateContext ctx [("filepath", PPVar filename), ("exported", PPList [])]
 
