@@ -147,14 +147,14 @@ lsMatch base left right =
 includeFile :: PPContext -> FilePath -> IO [NPPProperty]
 includeFile ctx filename =
   IO.readFile filename
-    >>= process newctx . mustParse
+    >>= process newctx . mustParse filename
   where
     newctx = updateContext ctx [("filepath", PPVar filename)]
 
 includeLib :: PPContext -> FilePath -> IO PPContext
 includeLib ctx filename =
   IO.readFile filename
-    >>= processLib newctx . mustParse
+    >>= processLib newctx . mustParse filename
   where
     newctx = updateContext ctx [("filepath", PPVar filename), ("exported", PPList [])]
 

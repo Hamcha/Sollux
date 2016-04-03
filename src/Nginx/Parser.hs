@@ -9,6 +9,7 @@ module Nginx.Parser
 , NPPTree
 , NPPValue(..)
 , Parsed
+, mustParse
 , parse
 , stripVoid
 ) where
@@ -18,7 +19,7 @@ import safe           Control.Monad.Except
 import safe           Utils                        (prependMB)
 
 -- | Result of "parse" calls that can fail
-type Parsed = Except ParseError
+type Parsed = Either (Int, ParseError)
 
 data ParseError = SyntaxError    String   [NPPToken]
                 | IndentMismatch NPPToken NPPToken
@@ -34,6 +35,8 @@ type NPPTree = [NPPProperty]
 
 -- | NPP Property (key/value pair)
 type NPPProperty = (String, NPPValue)
+
+type NPPLine = (Int, [NPPToken])
 
 data NPPToken = TString    String
               | TSpace     Char
@@ -52,12 +55,34 @@ instance Show NPPValue where
   show (NPPList x)       = "Multiple " ++ show x
   show (NPPBlock (x, y)) = "Block "    ++ show x ++ ": " ++ show y
 
-mustParse :: String -> NPPTree
-mustParse str = catchError (parse str) (\err -> error err)
+-- | "parse" wrapper that hard fails on parse errors
+mustParse :: String -> String -> NPPTree
+mustParse fname str = case (parse str) of
+    (Left  err ) -> error $ formatParseError fname err
+    (Right tree) -> tree
+
+formatParseError :: String -> (Int, ParseError) -> String
+formatParseError fname (line, err) =
+  "Parse error while reading " ++ fname ++ "\nLine: " ++ (show line) ++ "\n" ++ (show err)
 
 -- | Parses a NPP file and returns its parsed structure
 parse :: String -> Parsed NPPTree
-parse = parseLines . map (tokenize . trimRight) . filter nocomments . filter nonempty . lines
+parse = parseLines . nmap (tokenize . trimRight) . nfilter nocomments . nfilter nonempty . nlines
+
+nlines :: String -> [(Int, String)]
+nlines str = zip [1..length strlines] strlines where strlines = lines str
+
+nfilter :: (a -> Bool) -> [(b, a)] -> [(b, a)]
+nfilter fn = filter customfn where customfn (_, x) = fn x
+
+nmap :: (a -> b) -> [(c, a)] -> [(c, b)]
+nmap fn = map (napply fn)
+
+nspan :: (a -> Bool) -> [(c, a)] -> ([(c, a)], [(c, a)])
+nspan fn = span customfn where customfn (_, x) = fn x
+
+napply :: (a -> b) -> (c, a) -> (c, b)
+napply fn (n, a) = (n, fn a)
 
 nonempty :: String -> Bool
 nonempty str = not (null (dropWhile Char.isSpace str))
@@ -88,22 +113,22 @@ getIndentation []            = []
 getIndentation (TSpace x:xs) = TSpace x : getIndentation xs
 getIndentation (_       :_ ) = []
 
-dropIndent :: [NPPToken] -> [NPPToken] -> Parsed [NPPToken]
-dropIndent []     y                  = return y
-dropIndent (x:xs) (y:ys) | x == y    = dropIndent xs ys
-                         | otherwise = throwError $ IndentMismatch x y
+dropIndent :: [NPPToken] -> NPPLine -> Parsed NPPLine
+dropIndent []     y                       = return y
+dropIndent (x:xs) (n, (y:ys)) | x == y    = dropIndent xs (n, ys)
+                              | otherwise = throwError (n, IndentMismatch x y)
 
-trimIndent :: [[NPPToken]] -> Parsed [[NPPToken]]
+trimIndent :: [NPPLine] -> Parsed [NPPLine]
 trimIndent []   = return []
 trimIndent list = mapM (dropIndent indent) list
   where
     indent = getIndentation first
-    first  = head list
+    first  = snd $ head list
 
-parseValue :: NPPToken -> Parsed NPPValue
-parseValue (TSpace  _)  = return NPPVoid
-parseValue (TString x)  = return $ NPPVal x
-parseValue x            = throwError $ SyntaxError "Invalid token" [x]
+parseValue :: Int -> NPPToken -> Parsed NPPValue
+parseValue _ (TSpace  _)  = return NPPVoid
+parseValue _ (TString x)  = return $ NPPVal x
+parseValue n x            = throwError (n, SyntaxError "Invalid token" [x])
 
 -- | Strip NPPVoid values from NPPValue list
 stripVoid :: [NPPValue] -> [NPPValue]
@@ -116,24 +141,24 @@ wrapValue []     = NPPVoid
 wrapValue [x]    = x
 wrapValue xs     = NPPList xs
 
-parseLines :: [[NPPToken]] -> Parsed [NPPProperty]
-parseLines []                     = return []
-parseLines (x:xs) | isBlockDecl x = trimIndent indented
-                                      >>= \block -> prependMB (parseBlockExpr x block) (parseLines rest)
-                    | otherwise     = prependMB (parseProperty x) (parseLines xs)
-                    where
-                      (indented, rest) = span isIndent xs
+parseLines :: [NPPLine] -> Parsed [NPPProperty]
+parseLines []                          = return []
+parseLines ((n, x):xs) | isBlockDecl x = trimIndent indented
+                                           >>= \block -> prependMB (parseBlockExpr (n, x) block) (parseLines rest)
+                       | otherwise     = prependMB (parseProperty (n, x)) (parseLines xs)
+                       where
+                         (indented, rest) = nspan isIndent xs
 
 isBlockDecl :: [NPPToken] -> Bool
 isBlockDecl = elem TBlockDecl
 
-parseProperty :: [NPPToken] -> Parsed NPPProperty
-parseProperty (TString str : rest) = mapM parseValue rest
-                                       >>= \vals -> return (str, wrapValue $ stripVoid vals)
-parseProperty x                    = throwError $ SyntaxError "Unrecognized property type" x
+parseProperty :: NPPLine -> Parsed NPPProperty
+parseProperty (n, (TString str : rest)) = mapM (parseValue n) rest
+                                            >>= \vals -> return (str, wrapValue $ stripVoid vals)
+parseProperty (n, x)                    = throwError (n, SyntaxError "Unrecognized property type" x)
 
-parseBlockExpr :: [NPPToken] -> [[NPPToken]] -> Parsed NPPProperty
-parseBlockExpr x block =
+parseBlockExpr :: NPPLine -> [NPPLine] -> Parsed NPPProperty
+parseBlockExpr (n, x) block =
   parseLines block
-    >>= \parsedblock -> parseProperty (takeWhile (/= TBlockDecl) x)
+    >>= \parsedblock -> parseProperty (n, (takeWhile (/= TBlockDecl) x))
     >>= \prop        -> return (fst prop, NPPBlock (snd prop, parsedblock))
