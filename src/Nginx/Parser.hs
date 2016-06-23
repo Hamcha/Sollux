@@ -19,16 +19,23 @@ import safe           Control.Monad.Except
 import safe           Utils                        (prependMB)
 
 -- | Result of "parse" calls that can fail
-type Parsed = Either (Int, ParseError)
+type Parsed = Either ParseError
 
-data ParseError = SyntaxError    String   [NPPToken]
-                | IndentMismatch NPPToken NPPToken
-                | GenericError   String
+type ParseError = (LineInfo, ParseErrorInfo)
 
-instance Show ParseError where
+data ParseErrorInfo = SyntaxError    String   [NPPToken]
+                    | IndentMismatch NPPToken NPPToken
+                    | GenericError   String
+
+instance Show ParseErrorInfo where
   show (SyntaxError    e s) = "Syntax error: " ++ show e ++ "\nExpr: " ++ show s
   show (IndentMismatch e g) = "Indentation mismatch.\nExpected: " ++ show e ++ "\nGot: " ++ show g
   show (GenericError   s)   = "Parse error: " ++ s
+
+-- | Line info (for errors)
+data LineInfo = LineInfo { fileName   :: String
+                         , lineNumber :: Int
+                         }
 
 -- | Fully parsed NPP structure
 type NPPTree = [NPPProperty]
@@ -36,7 +43,7 @@ type NPPTree = [NPPProperty]
 -- | NPP Property (key/value pair)
 type NPPProperty = (String, NPPValue)
 
-type NPPLine = (Int, [NPPToken])
+type NPPLine = (LineInfo, [NPPToken])
 
 data NPPToken = TString    String
               | TSpace     Char
@@ -57,20 +64,23 @@ instance Show NPPValue where
 
 -- | "parse" wrapper that hard fails on parse errors
 mustParse :: String -> String -> NPPTree
-mustParse fname str = case (parse str) of
-    (Left  err ) -> error $ formatParseError fname err
+mustParse fname str = case parse fname str of
+    (Left  err ) -> error $ formatParseError err
     (Right tree) -> tree
 
-formatParseError :: String -> (Int, ParseError) -> String
-formatParseError fname (line, err) =
-  "Parse error while reading " ++ fname ++ "\nLine: " ++ (show line) ++ "\n" ++ (show err)
+formatParseError :: ParseError -> String
+formatParseError (line, err) =
+  "Parse error\nFile: " ++ fileName line ++ "\nLine: " ++ (show . lineNumber) line ++ "\n" ++ show err
 
 -- | Parses a NPP file and returns its parsed structure
-parse :: String -> Parsed NPPTree
-parse = parseLines . nmap (tokenize . trimRight) . nfilter nocomments . nfilter nonempty . nlines
+parse :: String -> String -> Parsed NPPTree
+parse fname = parseLines . nmap (tokenize . trimRight) . nfilter nocomments . nfilter nonempty . nlines fname
 
-nlines :: String -> [(Int, String)]
-nlines str = zip [1..length strlines] strlines where strlines = lines str
+nlines :: String -> String -> [(LineInfo, String)]
+nlines fname str = zip linfo strlines
+  where
+    linfo = map (LineInfo fname) [1..length strlines]
+    strlines = lines str
 
 nfilter :: (a -> Bool) -> [(b, a)] -> [(b, a)]
 nfilter fn = filter customfn where customfn (_, x) = fn x
@@ -114,9 +124,9 @@ getIndentation (TSpace x:xs) = TSpace x : getIndentation xs
 getIndentation (_       :_ ) = []
 
 dropIndent :: [NPPToken] -> NPPLine -> Parsed NPPLine
-dropIndent []     y                       = return y
-dropIndent (x:xs) (n, (y:ys)) | x == y    = dropIndent xs (n, ys)
-                              | otherwise = throwError (n, IndentMismatch x y)
+dropIndent []     y                     = return y
+dropIndent (x:xs) (n, y:ys) | x == y    = dropIndent xs (n, ys)
+                            | otherwise = throwError (n, IndentMismatch x y)
 
 trimIndent :: [NPPLine] -> Parsed [NPPLine]
 trimIndent []   = return []
@@ -125,7 +135,7 @@ trimIndent list = mapM (dropIndent indent) list
     indent = getIndentation first
     first  = snd $ head list
 
-parseValue :: Int -> NPPToken -> Parsed NPPValue
+parseValue :: LineInfo -> NPPToken -> Parsed NPPValue
 parseValue _ (TSpace  _)  = return NPPVoid
 parseValue _ (TString x)  = return $ NPPVal x
 parseValue n x            = throwError (n, SyntaxError "Invalid token" [x])
@@ -153,12 +163,12 @@ isBlockDecl :: [NPPToken] -> Bool
 isBlockDecl = elem TBlockDecl
 
 parseProperty :: NPPLine -> Parsed NPPProperty
-parseProperty (n, (TString str : rest)) = mapM (parseValue n) rest
-                                            >>= \vals -> return (str, wrapValue $ stripVoid vals)
-parseProperty (n, x)                    = throwError (n, SyntaxError "Unrecognized property type" x)
+parseProperty (n, TString str : rest) = mapM (parseValue n) rest
+                                          >>= \vals -> return (str, wrapValue $ stripVoid vals)
+parseProperty (n, x)                  = throwError (n, SyntaxError "Unrecognized property type" x)
 
 parseBlockExpr :: NPPLine -> [NPPLine] -> Parsed NPPProperty
 parseBlockExpr (n, x) block =
   parseLines block
-    >>= \parsedblock -> parseProperty (n, (takeWhile (/= TBlockDecl) x))
+    >>= \parsedblock -> parseProperty (n, takeWhile (/= TBlockDecl) x)
     >>= \prop        -> return (fst prop, NPPBlock (snd prop, parsedblock))
