@@ -8,12 +8,11 @@ Sollux <s>is</s> *will be* a tool used in HMI (Hamcha's server) for easier manag
 Planned features are:
 
 - A more flexible nginx configuration file format (NPP)
-- Management of Letsencrypt certificates
 - Easier management of /etc/pf.conf (HMI runs FreeBSD) for jail port forwarding
 
 ## What's currently in
 
-NPP should be barely usable, hasn't been tested in production yet tho.
+- NPP language (supporting includes, libraries and functions)
 
 ## Requirements
 
