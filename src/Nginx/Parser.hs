@@ -16,7 +16,7 @@ module Nginx.Parser
 , stripVoid
 ) where
 
-import safe           Control.Monad.Except
+import safe           Control.Monad.Except         (throwError)
 import safe qualified Data.Char            as Char (isSpace)
 import safe           Utils                        (prependMB)
 
@@ -76,9 +76,8 @@ instance Show NPPValue where
 
 -- | "parse" wrapper that hard fails on parse errors
 mustParse :: String -> String -> NPPTree
-mustParse fname str = case parse fname str of
-    (Left  err ) -> error $ formatParseError err
-    (Right tree) -> tree
+mustParse fname str = case parse fname str of Left  err  -> error $ formatParseError err
+                                              Right tree -> tree
 
 -- | Render error details to string (to be printed)
 formatParseError :: ParseError -> String

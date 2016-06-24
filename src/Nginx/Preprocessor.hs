@@ -60,9 +60,8 @@ instance Eq PPValue where
 -- | "process" wrapper that hard fails on processing errors
 mustProcess :: PPContext -> [NPPProperty] -> IO [NPPProperty]
 mustProcess c p = runExceptT (process c p)
-    >>= \res -> case res of
-      (Left  err  ) -> error $ formatProcessError err
-      (Right props) -> return props
+    >>= \case Left  err   -> error $ formatProcessError err
+              Right props -> return props
 
 formatProcessError :: ProcessError -> String
 formatProcessError (PPErr line err) =
@@ -124,18 +123,18 @@ execute ctx _ "func" (NPPBlock (NPPList (NPPVal name:nargs), content)) =
 -- "include PATH"
 --  Read the contents of <PATH> (one or more files), parse it as NPP files
 --  and append their trees to the current one
-execute ctx _ "include" (NPPVal y) =
+execute ctx l "include" (NPPVal y) =
   getFilenames filename
-    >>= mapM (includeFile ctx)
+    >>= mapM (includeFile ctx l)
     >>= \out -> return (ctx, concat out)
   where
     filename = includepathdiff ctx ".npp" y
 -- "uselib PATH"
 --  Read the contents of <PATH> (one or more files), parse it as NPP libraries
 --  and append their contexts to the current one
-execute ctx _ "uselib" (NPPVal y) =
+execute ctx l "uselib" (NPPVal y) =
   getFilenames filename
-    >>= mapM (includeLib ctx)
+    >>= mapM (includeLib ctx l)
     >>= \out -> return (foldr updateContext ctx out, [])
   where
     filename = includepathdiff ctx ".npplib" y
@@ -175,19 +174,21 @@ lsMatch base left right =
     fullpath x = base ++ x
     match x = List.isPrefixOf left x && List.isSuffixOf right x
 
-includeFile :: PPContext -> FilePath -> Processed [NPPProperty]
-includeFile ctx filename =
-  (liftIO . IO.readFile) filename
-    >>= process newctx . mustParse filename
+includeFile :: PPContext -> LineInfo -> FilePath -> Processed [NPPProperty]
+includeFile ctx l filename =
+  (liftIO . try . IO.readFile) filename
+    >>= \case Right r -> (process newctx . mustParse filename) r
+              Left  e -> throwError $ PPErr l $ IncludeFileError e
   where
     newctx = updateContext ctx [("filepath", PPVar filename)]
 
-includeLib :: PPContext -> FilePath -> Processed PPContext
-includeLib ctx filename =
-  (liftIO . IO.readFile) filename
-    >>= processLib newctx . mustParse filename
+includeLib :: PPContext -> LineInfo -> FilePath -> Processed PPContext
+includeLib ctx l filename =
+  (liftIO . try . IO.readFile) filename
+    >>= \case Right r -> (processLib newctx . mustParse filename) r
+              Left  e -> throwError $ PPErr l $ IncludeFileError e
   where
-    newctx = updateContext ctx [("filepath", PPVar filename), ("exported", PPList [])]
+    newctx   = updateContext ctx [("filepath", PPVar filename), ("exported", PPList [])]
 
 processPlain :: PPContext -> NPPValue -> NPPValue
 processPlain _  NPPVoid    = NPPVoid
