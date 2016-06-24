@@ -11,23 +11,27 @@ module Nginx.Preprocessor
 , process
 ) where
 
-import safe           Control.Monad.Except
-import safe           Nginx.Parser                 (NPPProperty(..), NPPValue(..), LineInfo(..), mustParse)
+import safe           Control.Exception            (try, IOException)
+import safe           Control.Monad.Except         (ExceptT, liftIO, runExceptT, throwError)
+import safe           Nginx.Parser                 (NPPProperty(..), NPPValue(..), LineInfo(..), lineFileInfo, mustParse)
 import safe qualified Data.List        as List     (intercalate, unionBy, isPrefixOf, isSuffixOf)
 import safe qualified System.Directory as Dir      (listDirectory)
 import safe qualified System.FilePath  as Filepath (dropFileName, splitFileName, hasExtension)
 import safe qualified System.IO        as IO       (readFile)
+import safe           System.IO.Error              (ioeGetFileName, ioeGetErrorString)
 import safe           Utils                        (abspath, must)
 
 
 data ProcessErrorInfo = UnknownDirective String
                       | ValNotAFunction  String
                       | ListNotAFunction String
+                      | IncludeFileError IOException
 
 instance Show ProcessErrorInfo where
   show (UnknownDirective s) = "Unknown NPP directive: " ++ s
   show (ValNotAFunction  s) = "Calling \"" ++ s ++ "\" (value) as function"
   show (ListNotAFunction s) = "Calling \"" ++ s ++ "\" (list) as function"
+  show (IncludeFileError e) = "Cannot include file \"" ++ (must . ioeGetFileName) e ++ "\": " ++ ioeGetErrorString e
 
 data ProcessError = PPErr LineInfo ProcessErrorInfo
 
@@ -62,7 +66,7 @@ mustProcess c p = runExceptT (process c p)
 
 formatProcessError :: ProcessError -> String
 formatProcessError (PPErr line err) =
-  "Processing error in " ++ fileName line ++ ":" ++ (show . lineNumber) line ++ "\n  " ++ show err
+  "Processing error:\n" ++ lineFileInfo line ++ ": " ++ lineString line ++ "\n  " ++ show err
 
 -- | Process an NPP tree (NPP files)
 process :: PPContext -> [NPPProperty] -> Processed [NPPProperty]

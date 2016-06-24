@@ -6,6 +6,7 @@ Description : Parsing structure and functions for .npp (nginx templates) files
 -}
 module Nginx.Parser
 ( LineInfo(..)
+, lineFileInfo
 , NPPProperty(..)
 , NPPTree
 , NPPValue(..)
@@ -36,10 +37,11 @@ instance Show ParseErrorInfo where
 -- | Line info (for errors)
 data LineInfo = LineInfo { fileName   :: String
                          , lineNumber :: Int
+                         , lineString :: String
                          }
 
-instance Show LineInfo where
-  show (LineInfo name num) = name ++ ":" ++ show num
+lineFileInfo :: LineInfo -> String
+lineFileInfo l = fileName l ++ ":" ++ (show . lineNumber) l
 
 -- | Fully parsed NPP structure
 type NPPTree = [NPPProperty]
@@ -51,8 +53,7 @@ data NPPProperty = NPPProp { lineInfo  :: LineInfo
                            }
 
 instance Show NPPProperty where
-  show (NPPProp line key value) = "[" ++ show line ++ "] " ++ key ++ ": " ++ show value
-
+  show (NPPProp line key value) = "[" ++ lineFileInfo line ++ "] " ++ key ++ ": " ++ show value
 
 type NPPLine = (LineInfo, [NPPToken])
 
