@@ -79,44 +79,59 @@ mustParse fname str = case parse fname str of
     (Left  err ) -> error $ formatParseError err
     (Right tree) -> tree
 
+-- | Render error details to string (to be printed)
 formatParseError :: ParseError -> String
 formatParseError (NPPErr line err) =
-  "Parse error in " ++ fileName line ++ ":" ++ (show . lineNumber) line ++ "\n  " ++ show err
+  "Parse error:\n" ++ lineFileInfo line ++ ": " ++ lineString line ++ "\n  " ++ show err
 
 -- | Parses a NPP file and returns its parsed structure
 parse :: String -> String -> Parsed NPPTree
 parse fname = parseLines . nmap (tokenize . trimRight) . nfilter nocomments . nfilter nonempty . nlines fname
 
+-- | Attach line metadata (filename, number, ..) to each line to parse
 nlines :: String -> String -> [(LineInfo, String)]
 nlines fname str = zip linfo strlines
   where
-    linfo = map (LineInfo fname) [1..length strlines]
+    linfo = map (\(x, y) -> LineInfo fname x $ trimSpace y) $ zip [1..length strlines] strlines
     strlines = lines str
 
+-- | Filter wrapper for NPPLine
 nfilter :: (a -> Bool) -> [(b, a)] -> [(b, a)]
 nfilter fn = filter customfn where customfn (_, x) = fn x
 
+-- | Map wrapper for NPPLine
 nmap :: (a -> b) -> [(c, a)] -> [(c, b)]
 nmap fn = map (napply fn)
 
+-- | Span wrapper for NPPLine
 nspan :: (a -> Bool) -> [(c, a)] -> ([(c, a)], [(c, a)])
 nspan fn = span customfn where customfn (_, x) = fn x
 
+-- | Function application wrapper for NPPLine
 napply :: (a -> b) -> (c, a) -> (c, b)
 napply fn (n, a) = (n, fn a)
 
+-- | Check if a line is empty after trimming whitespace
 nonempty :: String -> Bool
 nonempty str = not (null (dropWhile Char.isSpace str))
 
+-- | Check if a line is not a comment (begins with #) after trimming whitespace
 nocomments :: String -> Bool
 nocomments = (/= '#') . head . dropWhile Char.isSpace
 
+-- | Trim right whitespace
 trimRight :: String -> String
-trimRight = reverse . dropWhile (\x -> Char.isSpace x || (x == ';')) . reverse
+trimRight = reverse . trimSpace . reverse
 
+-- | Trim left whitespace
+trimSpace :: String -> String
+trimSpace = dropWhile (\x -> Char.isSpace x || (x == ';'))
+
+-- | Exposed tokenizing function (calls internal tokenize')
 tokenize :: String -> [NPPToken]
 tokenize str = tokenize' str ""
 
+-- | Internal tokenizer function
 tokenize' :: String -> String -> [NPPToken]
 tokenize' ""       ""                  = []
 tokenize' ""       cw                  = [TString cw]
@@ -124,27 +139,31 @@ tokenize' [':']    cw                  = tokenize' "" cw ++ [TBlockDecl]
 tokenize' (x  :xs) cw | Char.isSpace x = tokenize' "" cw ++ TSpace x : tokenize' xs ""
                       | otherwise      = tokenize' xs (cw ++ [x])
 
+-- | Check if token list has indentation
 isIndent :: [NPPToken] -> Bool
 isIndent []           = False
 isIndent (TSpace _:_) = True
 isIndent (_       :_) = False
 
+-- | Get indentation from token list
 getIndentation :: [NPPToken] -> [NPPToken]
 getIndentation []            = []
 getIndentation (TSpace x:xs) = TSpace x : getIndentation xs
 getIndentation (_       :_ ) = []
 
-dropIndent :: [NPPToken] -> NPPLine -> Parsed NPPLine
-dropIndent []     y                     = return y
-dropIndent (x:xs) (n, y:ys) | x == y    = dropIndent xs (n, ys)
-                            | otherwise = throwError $ NPPErr n $ IndentMismatch x y
-
+-- | Exposed function to trim indentation from token list (calls internal "dropIndent")
 trimIndent :: [NPPLine] -> Parsed [NPPLine]
 trimIndent []   = return []
 trimIndent list = mapM (dropIndent indent) list
   where
     indent = getIndentation first
     first  = snd $ head list
+
+-- | Internal function to trim indentation from token list
+dropIndent :: [NPPToken] -> NPPLine -> Parsed NPPLine
+dropIndent []     y                     = return y
+dropIndent (x:xs) (n, y:ys) | x == y    = dropIndent xs (n, ys)
+                            | otherwise = throwError $ NPPErr n $ IndentMismatch x y
 
 parseValue :: LineInfo -> NPPToken -> Parsed NPPValue
 parseValue _ (TSpace  _)  = return NPPVoid
@@ -163,15 +182,12 @@ wrapValue [x]    = x
 wrapValue xs     = NPPList xs
 
 parseLines :: [NPPLine] -> Parsed [NPPProperty]
-parseLines []                          = return []
-parseLines ((n, x):xs) | isBlockDecl x = trimIndent indented
+parseLines []                                = return []
+parseLines ((n, x):xs) | TBlockDecl `elem` x = trimIndent indented
                                            >>= \block -> prependMB (parseBlockExpr (n, x) block) (parseLines rest)
-                       | otherwise     = prependMB (parseProperty (n, x)) (parseLines xs)
+                       | otherwise           = prependMB (parseProperty (n, x)) (parseLines xs)
                        where
                          (indented, rest) = nspan isIndent xs
-
-isBlockDecl :: [NPPToken] -> Bool
-isBlockDecl = elem TBlockDecl
 
 parseProperty :: NPPLine -> Parsed NPPProperty
 parseProperty (n, TString str : rest) = mapM (parseValue n) rest
