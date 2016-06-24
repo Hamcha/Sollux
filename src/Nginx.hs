@@ -12,7 +12,7 @@ module Nginx
 import safe qualified CLI                (unknownSub, unknownSubHelp)
 import safe qualified Config             (Cfg, loadCfg)
 import safe           Nginx.Parser       (mustParse)
-import safe           Nginx.Preprocessor (PPValue(..), process)
+import safe           Nginx.Preprocessor (PPValue(..), mustProcess)
 import safe           Nginx.Compiler     (compile)
 import safe qualified System.IO as IO    (readFile, writeFile)
 import safe           Utils              (abspath, must)
@@ -30,7 +30,7 @@ execute _ (x:_) = CLI.unknownSub ["npp"] x
 regen :: Config.Cfg -> IO ()
 regen cfg =
   IO.readFile path
-    >>= process ctx . mustParse path
+    >>= mustProcess ctx . mustParse path
     >>= IO.writeFile outpath . compile
   where
     ctx     = [("filepath", PPVar path)]

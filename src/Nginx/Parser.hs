@@ -5,7 +5,8 @@ Module      : Nginx.Parser
 Description : Parsing structure and functions for .npp (nginx templates) files
 -}
 module Nginx.Parser
-( NPPProperty
+( LineInfo(..)
+, NPPProperty(..)
 , NPPTree
 , NPPValue(..)
 , Parsed
@@ -14,14 +15,14 @@ module Nginx.Parser
 , stripVoid
 ) where
 
-import safe qualified Data.Char            as Char (isSpace)
 import safe           Control.Monad.Except
+import safe qualified Data.Char            as Char (isSpace)
 import safe           Utils                        (prependMB)
 
 -- | Result of "parse" calls that can fail
 type Parsed = Either ParseError
 
-type ParseError = (LineInfo, ParseErrorInfo)
+data ParseError = NPPErr LineInfo ParseErrorInfo
 
 data ParseErrorInfo = SyntaxError    String   [NPPToken]
                     | IndentMismatch NPPToken NPPToken
@@ -37,11 +38,21 @@ data LineInfo = LineInfo { fileName   :: String
                          , lineNumber :: Int
                          }
 
+instance Show LineInfo where
+  show (LineInfo name num) = name ++ ":" ++ show num
+
 -- | Fully parsed NPP structure
 type NPPTree = [NPPProperty]
 
 -- | NPP Property (key/value pair)
-type NPPProperty = (String, NPPValue)
+data NPPProperty = NPPProp { lineInfo  :: LineInfo
+                           , propKey   :: String
+                           , propValue :: NPPValue
+                           }
+
+instance Show NPPProperty where
+  show (NPPProp line key value) = "[" ++ show line ++ "] " ++ key ++ ": " ++ show value
+
 
 type NPPLine = (LineInfo, [NPPToken])
 
@@ -69,8 +80,8 @@ mustParse fname str = case parse fname str of
     (Right tree) -> tree
 
 formatParseError :: ParseError -> String
-formatParseError (line, err) =
-  "Parse error\nFile: " ++ fileName line ++ "\nLine: " ++ (show . lineNumber) line ++ "\n" ++ show err
+formatParseError (NPPErr line err) =
+  "Parse error in " ++ fileName line ++ ":" ++ (show . lineNumber) line ++ "\n  " ++ show err
 
 -- | Parses a NPP file and returns its parsed structure
 parse :: String -> String -> Parsed NPPTree
@@ -126,7 +137,7 @@ getIndentation (_       :_ ) = []
 dropIndent :: [NPPToken] -> NPPLine -> Parsed NPPLine
 dropIndent []     y                     = return y
 dropIndent (x:xs) (n, y:ys) | x == y    = dropIndent xs (n, ys)
-                            | otherwise = throwError (n, IndentMismatch x y)
+                            | otherwise = throwError $ NPPErr n $ IndentMismatch x y
 
 trimIndent :: [NPPLine] -> Parsed [NPPLine]
 trimIndent []   = return []
@@ -138,7 +149,7 @@ trimIndent list = mapM (dropIndent indent) list
 parseValue :: LineInfo -> NPPToken -> Parsed NPPValue
 parseValue _ (TSpace  _)  = return NPPVoid
 parseValue _ (TString x)  = return $ NPPVal x
-parseValue n x            = throwError (n, SyntaxError "Invalid token" [x])
+parseValue n x            = throwError $ NPPErr n $ SyntaxError "Invalid token" [x]
 
 -- | Strip NPPVoid values from NPPValue list
 stripVoid :: [NPPValue] -> [NPPValue]
@@ -164,11 +175,11 @@ isBlockDecl = elem TBlockDecl
 
 parseProperty :: NPPLine -> Parsed NPPProperty
 parseProperty (n, TString str : rest) = mapM (parseValue n) rest
-                                          >>= \vals -> return (str, wrapValue $ stripVoid vals)
-parseProperty (n, x)                  = throwError (n, SyntaxError "Unrecognized property type" x)
+                                          >>= \vals -> return $ NPPProp n str (wrapValue $ stripVoid vals)
+parseProperty (n, x)                  = throwError $ NPPErr n $ SyntaxError "Unrecognized property type" x
 
 parseBlockExpr :: NPPLine -> [NPPLine] -> Parsed NPPProperty
 parseBlockExpr (n, x) block =
   parseLines block
     >>= \parsedblock -> parseProperty (n, takeWhile (/= TBlockDecl) x)
-    >>= \prop        -> return (fst prop, NPPBlock (snd prop, parsedblock))
+    >>= \prop        -> return $ NPPProp n (propKey prop) (NPPBlock (propValue prop, parsedblock))
