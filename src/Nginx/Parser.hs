@@ -38,7 +38,7 @@ instance Show ParseErrorInfo where
 data LineInfo = LineInfo { fileName   :: String
                          , lineNumber :: Int
                          , lineString :: String
-                         }
+                         } deriving Eq
 
 lineFileInfo :: LineInfo -> String
 lineFileInfo l = fileName l ++ ":" ++ (show . lineNumber) l
@@ -50,7 +50,7 @@ type NPPTree = [NPPProperty]
 data NPPProperty = NPPProp { lineInfo  :: LineInfo
                            , propKey   :: String
                            , propValue :: NPPValue
-                           }
+                           } deriving Eq
 
 instance Show NPPProperty where
   show (NPPProp line key value) = "[" ++ lineFileInfo line ++ "] " ++ key ++ ": " ++ show value
@@ -67,6 +67,7 @@ data NPPValue = NPPVoid                            -- ^ No value
               | NPPVal   String                    -- ^ Single string value
               | NPPList  [NPPValue]                -- ^ Multiple strings value
               | NPPBlock (NPPValue, [NPPProperty]) -- ^ Block containing other properties
+              deriving Eq
 
 instance Show NPPValue where
   show NPPVoid           = "Void"
@@ -176,6 +177,7 @@ stripVoid []           = []
 stripVoid (NPPVoid:xs) = stripVoid xs
 stripVoid (x      :xs) = x : stripVoid xs
 
+-- Wrap lists into single NPPValue
 wrapValue :: [NPPValue] -> NPPValue
 wrapValue []     = NPPVoid
 wrapValue [x]    = x
