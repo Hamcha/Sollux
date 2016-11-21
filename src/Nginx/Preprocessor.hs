@@ -19,13 +19,11 @@ import safe qualified System.Directory as Dir      (listDirectory)
 import safe qualified System.FilePath  as Filepath (dropFileName, splitFileName, hasExtension)
 import safe qualified System.IO        as IO       (readFile)
 import safe           System.IO.Error              (ioeGetFileName, ioeGetErrorString)
-import safe           Utils                        (abspath, must)
+import safe           Utils                        (abspath, must, fallback)
 
 
 data ProcessErrorInfo = UnknownDirective   String
                       | ValNotAFunction    String
-                      | ListNotAFunction   String
-                      | BoolNotAFunction   String
                       | IncludeFileError   IOException
                       | MalformedCondition ConditionError
                       | MissingIfCondition
@@ -33,8 +31,6 @@ data ProcessErrorInfo = UnknownDirective   String
 instance Show ProcessErrorInfo where
   show (UnknownDirective   s) = "Unknown NPP directive: " ++ s
   show (ValNotAFunction    s) = "Calling \"" ++ s ++ "\" (value) as function"
-  show (ListNotAFunction   s) = "Calling \"" ++ s ++ "\" (list) as function"
-  show (BoolNotAFunction   s) = "Calling \"" ++ s ++ "\" (bool) as function"
   show (IncludeFileError   e) = "Cannot include file \"" ++ (must . ioeGetFileName) e ++ "\": " ++ ioeGetErrorString e
   show (MalformedCondition c) = "Malformed condition: " ++ (show c)
   show MissingIfCondition     = "Calling 'else'/'elif' with no 'if'"
@@ -54,12 +50,14 @@ data PPValue = PPVar  String
              | PPList [PPValue]
              | PPFunc PPFunction
              | PPBool Bool
+             | PPVoid
 
 instance Show PPValue where
   show (PPVar  x) = x
   show (PPList x) = "List<" ++ (List.intercalate "," . map show) x ++ ">"
   show (PPFunc _) = "Function()"
   show (PPBool b) = "Bool<" ++ show b ++ ">"
+  show  PPVoid    = ""
 
 instance Eq PPValue where
   (==) (PPVar  x) (PPVar  y) = x == y
@@ -194,12 +192,8 @@ execute ctx l name args =
     Just (PPFunc fn) ->
       fn (unwrapValue $ processPlain ctx args)
         >>= \result -> return (ctx, result)
-    Just (PPVar _) ->
+    Just _ ->
       throwError $ PPErr l $ ValNotAFunction name
-    Just (PPList _) ->
-      throwError $ PPErr l $ ListNotAFunction name
-    Just (PPBool _) ->
-      throwError $ PPErr l $ BoolNotAFunction name
     Nothing ->
       throwError $ PPErr l $ UnknownDirective name
 
@@ -244,7 +238,7 @@ processValue _ []       = []
 processValue c ('\\':'@':xs) = '@' : processValue c xs
 processValue c (     '@':xs) = value ++ processValue c rest
                               where
-                                value       = show . must $ lookup var c
+                                value       = show . fallback PPVoid $ lookup var c
                                 (var, rest) = extractVariableName xs
 processValue c (       x:xs) = x : processValue c xs
 

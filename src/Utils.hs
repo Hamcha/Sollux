@@ -6,6 +6,7 @@ Description : Util functions for other modules
 -}
 module Utils
 ( abspath
+, fallback
 , must
 , prependM
 , prependMB
@@ -17,6 +18,11 @@ import safe qualified System.FilePath as Filepath (combine)
 must :: Maybe a -> a
 must (Just c) = c
 must _        = error "Could not find required value!"
+
+-- | Lift Maybe with fallback
+fallback :: a -> Maybe a -> a
+fallback _ (Just c) = c
+fallback f Nothing  = f
 
 -- | Return the path if absolute, prepend a base path if relative
 abspath :: FilePath -> FilePath -> FilePath
